@@ -274,6 +274,142 @@ Provides an abstraction layer for all database operations related to the scorebo
 - Easier scaling and monitoring
 - Clear separation of concerns between edge security and core business logic
 ---
+
+## Scalability & High-Traffic Readiness (3M+ Users)
+
+### Objective
+
+To support **millions of concurrent users (3M+)**, the system is designed to **scale horizontally**, distribute load efficiently, and remain observable under heavy traffic.
+
+This section outlines how the architecture can be enhanced to handle **high throughput and peak concurrency**.
+
+---
+
+## Load Balancing Strategy
+
+### Entry Layer (Traffic Distribution)
+
+- Use a **managed load balancer** as the single public entry point:
+  - AWS Application Load Balancer (ALB)
+
+**Responsibilities**
+- Distribute incoming HTTP and WebSocket traffic
+- Health checks for backend services
+- TLS termination
+- Request routing by path or service
+
+## Horizontal Scaling
+
+### Stateless Services
+
+All backend services are designed to be **stateless**, enabling:
+- Horizontal scaling via replicas
+- Safe traffic distribution
+- Zero session affinity dependency
+
+### Scaling Mechanisms
+
+| Platform | Scaling Method |
+|--------|----------------|
+AWS ECS | Auto Scaling Groups (CPU / memory / request count) |
+Kubernetes | Horizontal Pod Autoscaler (HPA) |
+API Gateway | Managed auto-scaling |
+
+---
+
+## WebSocket Scaling (Real-Time Traffic)
+
+To support millions of real-time connections:
+
+- Use a **shared message broker**:
+  - Redis Pub/Sub
+  - Kafka
+- Each WebSocket instance:
+  - Subscribes to score update events
+  - Broadcasts to connected clients
+
+## Database Scalability
+
+### Read & Write Optimization
+
+- Use **read-optimized indexes** for leaderboard queries
+- Separate:
+  - Write-heavy paths (score updates)
+  - Read-heavy paths (leaderboard display)
+
+### NoSQL Strategy (DynamoDB)
+
+- Partition by `userId`
+- Enable on-demand capacity or auto-scaling
+- Use Global Secondary Index (GSI) for leaderboard access patterns
+
+---
+
+## Caching Layer
+
+Introduce caching to reduce database pressure:
+
+- Redis / ElastiCache
+- Cache Top 10 leaderboard with short TTL (e.g. 1–5 seconds)
+- Cache invalidation triggered by score updates
+
+---
+
+## Monitoring & Observability
+
+### Metrics
+
+Track:
+- Request rate (RPS)
+- Error rate
+- Latency (P50 / P95 / P99)
+- WebSocket connections count
+- Score update throughput
+
+### Tools
+
+| Area | Tool |
+|----|----|
+Metrics | Prometheus / CloudWatch |
+Logging | ELK / CloudWatch Logs |
+Tracing | OpenTelemetry / AWS X-Ray |
+Alerts | Alertmanager / CloudWatch Alarms |
+
+---
+
+## Fault Tolerance & Resilience
+
+- Health checks at load balancer level
+- Circuit breakers for downstream services
+- Graceful degradation for non-critical features
+- Automatic instance replacement on failure
+
+---
+
+## Capacity Planning (Example)
+
+| Component | Strategy |
+|--------|---------|
+API Gateway | Auto-scale |
+Backend Services | Scale replicas horizontally |
+WebSocket | Shard connections across instances |
+Database | On-demand / auto-scaling |
+Cache | Cluster mode |
+
+---
+
+## Summary
+
+By applying:
+- Load balancing
+- Stateless service design
+- Horizontal auto-scaling
+- Caching
+- Centralized monitoring
+
+The system can **safely handle 3M+ users**, absorb traffic spikes, and scale dynamically while maintaining reliability and performance.
+
+---
 ### Containerization with Docker & Docker Compose
 
 #### Purpose
@@ -296,32 +432,3 @@ Benefits:
 - Consistent environments across teams
 - Isolated internal services
 - Easy CI/CD integration
-
-### Cloud-Native Deployment (AWS & Kubernetes)
-
-```text
-Client
-  │
-  ▼
-AWS API Gateway
-  │
-  ▼
-ECS / EKS (Private Subnet)
-  │
-  ├── Auth Service
-  ├── User Service
-  ├── Score Board Service
-  └── WebSocket Service
-  │
-  ▼
-DynamoDB / ElastiCache
-```
-### Benefits of This Approach
-
-| Area | Benefit |
-|------|---------|
-| Security | No public backend IPs |
-| Scalability | Auto-scaling containers |
-| Reliability | Managed infrastructure |
-| Cost | Pay-per-use |
-| Maintainability | Clear service boundaries |
